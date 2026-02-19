@@ -1,14 +1,14 @@
-# Architecture Overview
+# 아키텍처 개요
 
-## System Architecture
+## 시스템 아키텍처
 
-The enterprise wiki system operates as an iframe-embedded application within a Java/Spring groupware platform. It consists of three independently scalable services communicating through Redis.
+엔터프라이즈 위키 시스템은 Java/Spring 그룹웨어 플랫폼 내에 iframe으로 임베딩되어 동작합니다. Redis를 통해 통신하는 3개의 독립적으로 확장 가능한 서비스로 구성됩니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        User Browser                                 │
+│                        사용자 브라우저                                │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │              Groupware (Java/Spring, :80/443)                 │  │
+│  │              그룹웨어 (Java/Spring, :80/443)                   │  │
 │  │  ┌─────────────────────────────────────────────────────────┐  │  │
 │  │  │                    CoviWiki (iframe)                     │  │  │
 │  │  │              React + TipTap Editor + Yjs                │  │  │
@@ -19,10 +19,10 @@ The enterprise wiki system operates as an iframe-embedded application within a J
 │  │  └─────────────────────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └──────────────┬────────────────────────────────┬────────────────────┘
-               │ REST API (CWAT Cookie)         │ WebSocket (Yjs + Socket.IO)
+               │ REST API (CWAT 쿠키)           │ WebSocket (Yjs + Socket.IO)
                ▼                                ▼
 ┌──────────────────────────────┐  ┌──────────────────────────────────┐
-│    CoviWiki API Server       │  │    Collaboration Server          │
+│    CoviWiki API 서버          │  │    협업 서버                      │
 │    (NestJS + Fastify)        │  │    (Hocuspocus + Yjs)            │
 │                              │  │                                  │
 │  ┌────────┐  ┌────────────┐ │  │  ┌──────────┐  ┌─────────────┐  │
@@ -41,77 +41,78 @@ The enterprise wiki system operates as an iframe-embedded application within a J
 ┌──────────────┐  ┌──────────────┐  ┌────────────────────────────┐
 │   Database   │  │    Redis     │  │     Storage (Local / S3)   │
 │ MySQL / PG   │  │  Pub/Sub +   │  │                            │
-│  / Oracle    │  │  Queue + WS  │  │  Attachments, Images       │
+│  / Oracle    │  │  Queue + WS  │  │  첨부파일, 이미지            │
 └──────────────┘  └──────────────┘  └────────────────────────────┘
 ```
 
-## Deployment Model
+## 배포 모델
 
-The groupware and CoviWiki share the same domain, with path-based routing:
+그룹웨어와 CoviWiki는 동일 도메인을 공유하며, 경로 기반 라우팅을 사용합니다:
 
 ```
-company.com/              → Groupware (Java/Spring)
-company.com/coviwiki/     → CoviWiki Static Files (React SPA)
-company.com/coviwiki/api/ → CoviWiki API Server (NestJS, port 3000)
-company.com/coviwiki/collab/ → Collaboration Server (Hocuspocus, port 3001)
+company.com/              → 그룹웨어 (Java/Spring)
+company.com/coviwiki/     → CoviWiki 정적 파일 (React SPA)
+company.com/coviwiki/api/ → CoviWiki API 서버 (NestJS, port 3000)
+company.com/coviwiki/collab/ → 협업 서버 (Hocuspocus, port 3001)
 ```
 
-This eliminates cross-origin cookie issues — the `CWAT` JWT cookie is naturally shared under the same domain.
+이를 통해 Cross-Origin 쿠키 문제를 원천 차단합니다. `CWAT` JWT 쿠키는 동일 도메인이므로 자연스럽게 공유됩니다.
 
-## Server Module Structure
+## 서버 모듈 구조
 
 ```
 AppModule
 ├── CoreModule
-│   ├── AuthModule          # JWT auth, auto-login, token management
-│   ├── UserModule          # User lookup (groupware DB integration)
-│   ├── SpaceModule         # Space CRUD, member management
-│   ├── PageModule          # Page CRUD, tree structure, history
-│   ├── SearchModule        # DB-specific full-text search
-│   └── CaslModule          # RBAC permission management
+│   ├── AuthModule          # JWT 인증, 자동 로그인, 토큰 관리
+│   ├── UserModule          # 사용자 조회 (그룹웨어 DB 연동)
+│   ├── SpaceModule         # 스페이스 CRUD, 멤버 관리
+│   ├── PageModule          # 페이지 CRUD, 트리 구조, 히스토리
+│   ├── SearchModule        # DB별 전문 검색 (FTS)
+│   └── CaslModule          # RBAC 권한 관리
 │
-├── GwModule (custom)       # ← All custom groupware integration
-│   ├── GwController        # Groupware-specific API endpoints
-│   ├── GwService           # Business logic for GW features
-│   └── FileTokenService    # HMAC-SHA256 tokens for doc viewer
+├── GwModule (커스텀)       # ← 그룹웨어 통합 전체
+│   ├── GwController        # 그룹웨어 전용 API 엔드포인트
+│   ├── GwService           # GW 기능 비즈니스 로직
+│   └── FileTokenService    # 문서 뷰어용 HMAC-SHA256 토큰
 │
 ├── CollaborationModule
-│   ├── RedisSyncExtension  # ← Custom: multi-pod Yjs sync
-│   ├── AuthExtension       # Connection-time JWT validation
-│   └── PersistenceExtension # Yjs ↔ DB synchronization
+│   ├── RedisSyncExtension  # ← 커스텀: 멀티 Pod Yjs 동기화
+│   ├── AuthExtension       # 연결 시 JWT 검증
+│   └── PersistenceExtension # Yjs ↔ DB 동기화
 │
-├── WsModule                # Socket.IO + Redis adapter
-└── DatabaseModule          # Kysely ORM (multi-DB dialects)
+├── WsModule                # Socket.IO + Redis 어댑터
+└── DatabaseModule          # Kysely ORM (멀티 DB Dialect)
 ```
 
-## Authentication Flow
+## 인증 흐름
 
 ```
-User → Groupware Login → Session (X-User-Code, X-Company-Code headers)
+사용자 → 그룹웨어 로그인 → 세션 생성 (X-User-Code, X-Company-Code 헤더)
                               │
                               ▼
                     CoviWiki /api/auth/auto-login
                               │
-                              ├─ Lookup user in groupware DB (sys_object_user)
-                              ├─ Create/sync wiki user record
-                              ├─ Generate JWT (sub: userCode, workspaceId: companyCode)
-                              └─ Set CWAT cookie (HttpOnly, 2h expiry)
+                              ├─ 그룹웨어 DB에서 사용자 조회 (sys_object_user)
+                              ├─ 위키 사용자 레코드 생성/동기화
+                              ├─ JWT 생성 (sub: userCode, workspaceId: companyCode)
+                              └─ CWAT 쿠키 설정 (HttpOnly, 2시간 만료)
                               │
                               ▼
-                    Subsequent API requests include CWAT cookie
+                    이후 API 요청에 CWAT 쿠키 자동 포함
                               │
-                              ├─ DomainMiddleware: extract workspaceId
-                              ├─ JwtAuthGuard: validate token + load user
-                              └─ SpaceAbilityFactory: CASL permission check
+                              ├─ DomainMiddleware: workspaceId 추출
+                              ├─ JwtAuthGuard: 토큰 검증 + 사용자 로드
+                              └─ SpaceAbilityFactory: CASL 권한 체크
 ```
 
-## Client Data Flow
+## 클라이언트 데이터 흐름
 
 ```
 ┌──────────────┐     ┌────────────────┐     ┌──────────────────┐
-│  Jotai Atoms │────▶│ React Component│────▶│  TanStack Query  │
-│ (client state)│    │  (UI render)   │     │ (server state)   │
-└──────┬───────┘     └────────┬───────┘     └────────┬─────────┘
+│  Jotai Atom  │────▶│ React 컴포넌트  │────▶│  TanStack Query  │
+│ (클라이언트   │     │  (UI 렌더링)    │     │  (서버 상태)      │
+│    상태)      │     └────────┬───────┘     └────────┬─────────┘
+└──────┬───────┘              │                      │
        │                      │                      │
        │  currentUserAtom     │  usePageQuery()      │  Axios API Client
        │  socketAtom          │  useMutations()      │
@@ -119,14 +120,14 @@ User → Groupware Login → Session (X-User-Code, X-Company-Code headers)
        │                      │                      ▼
        │              ┌───────┴───────┐     ┌──────────────────┐
        └──────────────│  Socket.IO    │     │  REST API        │
-                      │  (live tree)  │     │  /api/gw/*       │
+                      │ (실시간 트리)  │     │  /api/gw/*       │
                       └───────────────┘     └──────────────────┘
 ```
 
-## Key Design Decisions
+## 핵심 설계 결정
 
-1. **Same-domain deployment** instead of separate origins — avoids third-party cookie restrictions and simplifies auth
-2. **Separate collaboration server** — can scale independently from the API server based on concurrent editor count
-3. **Redis as the universal bus** — Pub/Sub for collab sync, adapter for Socket.IO, backend for BullMQ job queues
-4. **Kysely over Prisma/TypeORM** — lightweight, type-safe query builder that allows custom dialect plugins for Oracle support
-5. **GwModule isolation** — all groupware-specific code in a single NestJS module, keeping the core Docmost modules unmodified for easier upstream merges
+1. **동일 도메인 배포** — 별도 오리진 대신 같은 도메인 하위 경로 사용. 서드파티 쿠키 제한 회피 및 인증 단순화
+2. **협업 서버 분리** — 동시 편집자 수에 따라 API 서버와 독립적으로 스케일링 가능
+3. **Redis를 범용 버스로 활용** — 협업 동기화(Pub/Sub), Socket.IO 어댑터, BullMQ 작업 큐 백엔드 등 다목적 사용
+4. **Prisma/TypeORM 대신 Kysely** — 경량 타입 안전 쿼리 빌더로 Oracle 지원을 위한 커스텀 Dialect 플러그인 구현 가능
+5. **GwModule 격리** — 그룹웨어 전용 코드를 단일 NestJS 모듈로 분리. 코어 Docmost 모듈을 수정하지 않아 업스트림 머지 용이

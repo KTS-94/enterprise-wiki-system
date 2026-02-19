@@ -1,79 +1,79 @@
-# iframe Bridge Protocol
+# iframe 브릿지 프로토콜
 
-## Overview
+## 개요
 
-CoviWiki runs inside an iframe within the enterprise groupware application. Communication between the parent window (groupware) and the iframe (wiki editor) uses the `window.postMessage` API.
+CoviWiki는 엔터프라이즈 그룹웨어 애플리케이션 내의 iframe에서 실행됩니다. 부모 창(그룹웨어)과 iframe(위키 에디터) 간 통신은 `window.postMessage` API를 사용합니다.
 
 ```
-Groupware (Parent Window)              CoviWiki (iframe)
+그룹웨어 (부모 창)                    CoviWiki (iframe)
         │                                      │
         │    outbound.js                       │    use-coviwiki-bridge.ts
-        │    (sends messages)                  │    (receives & dispatches)
+        │    (메시지 발신)                      │    (수신 및 디스패치)
         │                                      │
         │──── postMessage({type, payload}) ──▶ │
         │◀─── postMessage({type, payload}) ────│
         │                                      │
         │    inbound.js                        │    use-coviwiki-editor.ts
-        │    (receives messages)               │    (editor-specific actions)
+        │    (메시지 수신)                      │    (에디터 전용 액션)
 ```
 
-## Message Types
+## 메시지 타입
 
-### Groupware → CoviWiki (Inbound)
+### 그룹웨어 → CoviWiki (인바운드)
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `REQUEST_READY` | `{ pageId }` or `{ scope: "template", templateKey, mode? }` | Initial handshake — tells the wiki which page/template to load |
-| `SET_PAGE_EDIT_MODE` | `"edit"` \| `"read"` | Toggle between edit and read-only mode |
-| `SET_FULL_PAGE_WIDTH` | `boolean` | Toggle full-width editor layout |
-| `COVIWIKI_NAVIGATE` | `{ slug, pageId }` | Navigate to a different page |
-| `COVIWIKI_RESTORE_PAGE` | `{ title, content }` | Restore page from history version |
-| `COVIWIKI_TEMPLATE_USE` | `{ title, content }` | Apply template content to current page |
-| `REQUEST_HEADINGS` | — | Request heading list for TOC sidebar |
-| `SCROLL_TO_HEADING` | `number \| string` | Scroll editor to specific heading |
-| `COVIWIKI_SET_COMMENT` | `{ commentId }` | Add inline comment mark to selected text |
-| `COVIWIKI_REMOVE_COMMENT` | `{ commentId }` | Remove inline comment mark |
-| `SCROLL_TO_COMMENT_MARK` | `{ commentId }` | Scroll to comment mark position |
-| `TEMPLATE_CREATE` | `string` (template key) | Create new template |
+| 타입 | 페이로드 | 설명 |
+|------|---------|------|
+| `REQUEST_READY` | `{ pageId }` 또는 `{ scope: "template", templateKey, mode? }` | 초기 핸드셰이크 — 위키에 로드할 페이지/템플릿 지정 |
+| `SET_PAGE_EDIT_MODE` | `"edit"` \| `"read"` | 편집/읽기 전용 모드 전환 |
+| `SET_FULL_PAGE_WIDTH` | `boolean` | 전체 너비 에디터 레이아웃 토글 |
+| `COVIWIKI_NAVIGATE` | `{ slug, pageId }` | 다른 페이지로 네비게이션 |
+| `COVIWIKI_RESTORE_PAGE` | `{ title, content }` | 히스토리 버전에서 페이지 복원 |
+| `COVIWIKI_TEMPLATE_USE` | `{ title, content }` | 현재 페이지에 템플릿 콘텐츠 적용 |
+| `REQUEST_HEADINGS` | — | 목차(TOC) 사이드바용 헤딩 목록 요청 |
+| `SCROLL_TO_HEADING` | `number \| string` | 에디터를 특정 헤딩으로 스크롤 |
+| `COVIWIKI_SET_COMMENT` | `{ commentId }` | 선택된 텍스트에 인라인 댓글 마크 추가 |
+| `COVIWIKI_REMOVE_COMMENT` | `{ commentId }` | 인라인 댓글 마크 제거 |
+| `SCROLL_TO_COMMENT_MARK` | `{ commentId }` | 댓글 마크 위치로 스크롤 |
+| `TEMPLATE_CREATE` | `string` (템플릿 키) | 새 템플릿 생성 |
 
-### CoviWiki → Groupware (Outbound)
+### CoviWiki → 그룹웨어 (아웃바운드)
 
-| Type | Payload | Description |
-|------|---------|-------------|
-| `COVIWIKI_READY` | `{ scope, pageId?, templateKey? }` | Wiki is loaded and ready |
-| `goPage` | `{ pageId, title, slug }` | Request page navigation (groupware updates URL/breadcrumb) |
-| `receiveHeadings` | `Heading[]` | Return heading list for TOC |
-| `previewFile` | `{ fileId, token }` | Request document preview via Synap DocViewer |
-| `updateOnlineUsers` | `User[]` | Update online user list in groupware sidebar |
-| `updateConnectStatus` | `"connected"` \| `"disconnected"` | Collaboration connection status |
+| 타입 | 페이로드 | 설명 |
+|------|---------|------|
+| `COVIWIKI_READY` | `{ scope, pageId?, templateKey? }` | 위키 로드 완료 및 준비 상태 |
+| `goPage` | `{ pageId, title, slug }` | 페이지 네비게이션 요청 (그룹웨어가 URL/브레드크럼 갱신) |
+| `receiveHeadings` | `Heading[]` | 목차용 헤딩 목록 반환 |
+| `previewFile` | `{ fileId, token }` | Synap 문서 뷰어를 통한 파일 미리보기 요청 |
+| `updateOnlineUsers` | `User[]` | 그룹웨어 사이드바의 접속자 목록 갱신 |
+| `updateConnectStatus` | `"connected"` \| `"disconnected"` | 협업 연결 상태 |
 
-## Connection Lifecycle
+## 연결 라이프사이클
 
 ```
-1. Groupware loads CoviWiki in iframe
+1. 그룹웨어가 iframe에 CoviWiki 로드
    iframe src = "/coviwiki/gw/page/{pageId}"
 
-2. CoviWiki SPA initializes
-   ├─ Auto-login via CWAT cookie
-   ├─ Register message listener (use-coviwiki-bridge.ts)
-   └─ Wait for REQUEST_READY from parent
+2. CoviWiki SPA 초기화
+   ├─ CWAT 쿠키로 자동 로그인
+   ├─ 메시지 리스너 등록 (use-coviwiki-bridge.ts)
+   └─ 부모로부터 REQUEST_READY 대기
 
-3. Groupware sends REQUEST_READY
+3. 그룹웨어가 REQUEST_READY 전송
    { type: "REQUEST_READY", payload: { pageId: "abc-123" } }
 
-4. CoviWiki responds with COVIWIKI_READY
+4. CoviWiki가 COVIWIKI_READY로 응답
    { type: "COVIWIKI_READY", payload: { scope: "page", pageId: "abc-123" } }
 
-5. Bidirectional communication established
-   ├─ Groupware can send edit mode changes, scroll commands, etc.
-   └─ CoviWiki can request page navigation, file preview, etc.
+5. 양방향 통신 확립
+   ├─ 그룹웨어: 편집 모드 변경, 스크롤 명령 등 전송 가능
+   └─ CoviWiki: 페이지 네비게이션, 파일 미리보기 등 요청 가능
 ```
 
-## Implementation Details
+## 구현 상세
 
-### Client Side (`use-coviwiki-bridge.ts` — 267 lines)
+### 클라이언트 측 (`use-coviwiki-bridge.ts` — 267줄)
 
-The bridge hook sets up a `message` event listener that dispatches incoming messages to appropriate handlers:
+브릿지 훅이 `message` 이벤트 리스너를 설정하고 수신 메시지를 적절한 핸들러로 디스패치합니다:
 
 ```typescript
 export function useCoviWikiBridge() {
@@ -81,18 +81,18 @@ export function useCoviWikiBridge() {
     const handler = (event: MessageEvent<BridgeMsg>) => {
       switch (event.data.type) {
         case 'REQUEST_READY':
-          // Send COVIWIKI_READY back to parent
+          // 부모에게 COVIWIKI_READY 전송
           break;
         case 'SET_PAGE_EDIT_MODE':
-          // Dispatch custom event to editor
+          // 에디터에 커스텀 이벤트 디스패치
           document.dispatchEvent(
             new CustomEvent('COVIWIKI_SET_MODE', { detail: payload })
           );
           break;
         case 'REQUEST_HEADINGS':
-          // Extract headings from editor, send to parent
+          // 에디터에서 헤딩 추출, 부모에게 전송
           break;
-        // ... other message types
+        // ... 기타 메시지 타입
       }
     };
     window.addEventListener('message', handler);
@@ -101,18 +101,18 @@ export function useCoviWikiBridge() {
 }
 ```
 
-### Editor Integration (`use-coviwiki-editor.ts` — 236 lines)
+### 에디터 통합 (`use-coviwiki-editor.ts` — 236줄)
 
-A separate hook handles editor-specific bridge actions that require access to the TipTap editor instance:
+TipTap 에디터 인스턴스에 접근이 필요한 에디터 전용 브릿지 액션을 처리하는 별도 훅입니다:
 
-- Scroll to heading by index
-- Insert/remove inline comment marks
-- Extract heading list from document
-- Apply template or history restore content
+- 인덱스로 헤딩 위치 스크롤
+- 인라인 댓글 마크 삽입/제거
+- 문서에서 헤딩 목록 추출
+- 템플릿 또는 히스토리 복원 콘텐츠 적용
 
-### Type Safety
+### 타입 안전성
 
-All messages are typed via a discriminated union:
+모든 메시지는 Discriminated Union으로 타입이 지정됩니다:
 
 ```typescript
 type BridgeMsg =
@@ -121,20 +121,20 @@ type BridgeMsg =
   | { type: "COVIWIKI_RESTORE_PAGE"; payload: { title: any; content: any } }
   | { type: "REQUEST_HEADINGS" }
   | { type: "SCROLL_TO_HEADING"; payload: number | string }
-  // ... etc.
+  // ... 등
 ```
 
-### Groupware Side (JavaScript)
+### 그룹웨어 측 (JavaScript)
 
-The groupware uses three bridge scripts:
+그룹웨어는 3개의 브릿지 스크립트를 사용합니다:
 
-| Script | Role |
-|--------|------|
-| `coviWiki.base.js` | Configuration, iframe URL construction |
-| `coviWiki.outbound.js` | Send messages to CoviWiki iframe |
-| `coviWiki.inbound.js` | Receive and handle messages from CoviWiki |
+| 스크립트 | 역할 |
+|----------|------|
+| `coviWiki.base.js` | 설정, iframe URL 구성 |
+| `coviWiki.outbound.js` | CoviWiki iframe에 메시지 전송 |
+| `coviWiki.inbound.js` | CoviWiki에서 보낸 메시지 수신 및 처리 |
 
-Example outbound call:
+아웃바운드 호출 예시:
 ```javascript
 // coviWiki.outbound.js
 function setEditMode(mode) {
@@ -145,22 +145,22 @@ function setEditMode(mode) {
 }
 ```
 
-## GW-Specific Routes
+## GW 전용 라우트
 
-CoviWiki includes dedicated route components for groupware integration that strip the default wiki chrome (sidebar, header) and display only the editor content:
+CoviWiki는 그룹웨어 통합을 위한 전용 라우트 컴포넌트를 포함합니다. 기본 위키 크롬(사이드바, 헤더)을 제거하고 에디터 콘텐츠만 표시합니다:
 
-| Component | Route | Purpose |
-|-----------|-------|---------|
-| `use-gw-page-viewer.tsx` | `/gw/page/:pageId` | Page viewer (iframe mode) |
-| `use-gw-page-history.tsx` | `/gw/page/:pageId/history` | Page history viewer |
-| `use-gw-template-viewer.tsx` | `/gw/template/:key` | Template viewer |
-| `use-gw-template-write.tsx` | `/gw/template/:key/write` | Template editor |
-| `use-gw-template-history.tsx` | `/gw/template/:key/history` | Template history |
-| `use-gw-template-draft.tsx` | `/gw/template/:key/draft` | Template draft |
+| 컴포넌트 | 라우트 | 용도 |
+|----------|--------|------|
+| `use-gw-page-viewer.tsx` | `/gw/page/:pageId` | 페이지 뷰어 (iframe 모드) |
+| `use-gw-page-history.tsx` | `/gw/page/:pageId/history` | 페이지 히스토리 뷰어 |
+| `use-gw-template-viewer.tsx` | `/gw/template/:key` | 템플릿 뷰어 |
+| `use-gw-template-write.tsx` | `/gw/template/:key/write` | 템플릿 에디터 |
+| `use-gw-template-history.tsx` | `/gw/template/:key/history` | 템플릿 히스토리 |
+| `use-gw-template-draft.tsx` | `/gw/template/:key/draft` | 템플릿 임시저장 |
 
-## GW Mode Detection (`use-gw-mode.ts`)
+## GW 모드 감지 (`use-gw-mode.ts`)
 
-A lightweight hook detects whether the app is running in groupware mode by checking the URL path:
+URL 경로를 확인하여 앱이 그룹웨어 모드에서 실행 중인지 감지하는 경량 훅입니다:
 
 ```typescript
 export function useGwMode() {
@@ -171,4 +171,4 @@ export function useGwMode() {
 }
 ```
 
-When in GW mode, the app hides the default sidebar and navigation, relying on the parent groupware for those UI elements.
+GW 모드에서는 기본 사이드바와 네비게이션을 숨기고, 부모 그룹웨어가 제공하는 UI 요소에 의존합니다.
