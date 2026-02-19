@@ -9,7 +9,7 @@
 ## 기술 하이라이트
 
 이 레포지토리는 Docmost 원본 위에 직접 구현한 **커스텀 코드만** 포함합니다.
-30개 파일, ~4,600줄의 TypeScript로 엔터프라이즈 환경에 필요한 기능을 구현했습니다.
+54개 파일, ~11,600줄의 TypeScript로 엔터프라이즈 환경에 필요한 기능을 구현했습니다.
 
 ### 1. Kysely ORM용 Oracle Dialect 구현
 Kysely는 공식적으로 MySQL, PostgreSQL, SQLite만 지원합니다. Oracle Dialect를 직접 구현(662줄)하여 Oracle 11g Thick 모드, `ROWNUM` 기반 페이징, `JSON_OBJECT` 미지원 환경을 위한 문자열 연결 JSON 빌드를 처리합니다.
@@ -71,18 +71,22 @@ HWP(한컴오피스)와 Excel 붙여넣기를 위한 커스텀 Paste Handler를 
 ## 레포지토리 구조
 
 ```
-├── server/                          # 백엔드 커스텀 코드 (16개 파일, ~3,400줄)
+├── server/                          # 백엔드 커스텀 코드 (31개 파일, ~7,900줄)
+│   ├── main.ts                      # [MODIFIED] 앱 엔트리 포인트
 │   ├── gw/                          # [NEW] 그룹웨어 통합 모듈
-│   ├── database/                    # [NEW] 멀티 DB 지원 (Oracle Dialect, QueryBuilder)
-│   ├── collaboration/               # [NEW] 멀티 Pod 협업 Redis 동기화
+│   ├── core/                        # [MODIFIED] 도메인 모듈 (page, auth, search, casl 등)
+│   ├── database/                    # [NEW+MODIFIED] 멀티 DB (Oracle Dialect, Repository)
+│   ├── collaboration/               # [NEW+MODIFIED] 실시간 협업 (Redis 동기화, 영속화)
 │   ├── ws/                          # [NEW] WebSocket Redis 어댑터
 │   ├── common/                      # [NEW] 미들웨어, 데코레이터
 │   └── integrations/                # [MODIFIED] 환경 설정 확장
 │
-├── client/                          # 프론트엔드 커스텀 코드 (12개 파일, ~930줄)
-│   ├── features/editor/             # [NEW] 브릿지 훅, 붙여넣기 핸들러
+├── client/                          # 프론트엔드 커스텀 코드 (21개 파일, ~3,450줄)
+│   ├── features/editor/             # [MODIFIED] 에디터 핵심 (page-editor, 브릿지, 붙여넣기)
+│   ├── features/page/               # [MODIFIED] 페이지 기능 (비밀번호, 쿼리)
 │   ├── hooks/                       # [NEW] GW 모드 감지, 유휴 감지
-│   └── pages/                       # [NEW] GW 전용 라우트 컴포넌트
+│   ├── pages/                       # [NEW] GW 전용 라우트 컴포넌트
+│   └── lib/                         # [MODIFIED] 유틸리티, GW 설정
 │
 ├── packages/editor-ext/             # 공유 에디터 확장 (2개 파일, ~250줄)
 │   └── comment/                     # [NEW] 인라인 댓글 마크
@@ -101,16 +105,20 @@ HWP(한컴오피스)와 Excel 붙여넣기를 위한 커스텀 Paste Handler를 
 | 디렉토리 | 파일 수 | 라인 수 | 설명 |
 |----------|-------:|-------:|------|
 | `server/gw/` | 5 | 990 | 그룹웨어 API 모듈, 파일 토큰 서비스 |
-| `server/database/` | 5 | 1,288 | Oracle Dialect, QueryBuilder, 테이블 매퍼 |
-| `server/collaboration/` | 1 | 442 | Redis Pub/Sub 동기화 확장 |
+| `server/core/` | 8 | 2,659 | 페이지, 인증, 검색, 권한 도메인 모듈 |
+| `server/database/` | 8 | 2,592 | Oracle Dialect, QueryBuilder, Repository |
+| `server/collaboration/` | 4 | 817 | Redis 동기화, 영속화, 인증, 히스토리 |
 | `server/ws/` | 1 | 112 | Socket.IO Redis 어댑터 |
 | `server/common/` | 2 | 67 | 도메인 미들웨어, 인증 데코레이터 |
-| `server/integrations/` | 2 | 510 | 환경 설정 확장 (클러스터링, 스키마 등) |
-| `client/features/editor/` | 4 | 740 | 브릿지 훅, 붙여넣기 핸들러 |
+| `server/integrations/` | 2 | 510 | 환경 설정 확장 |
+| `server/main.ts` | 1 | 164 | 앱 엔트리 포인트 |
+| `client/features/editor/` | 8 | 2,101 | 에디터 핵심, 브릿지, 붙여넣기 |
+| `client/features/page/` | 3 | 850 | 페이지 쿼리, 서비스, 비밀번호 모달 |
 | `client/hooks/` | 2 | 71 | GW 모드, 유휴 감지 |
 | `client/pages/` | 6 | 116 | GW 라우트 컴포넌트 |
+| `client/lib/` | 2 | 311 | 유틸리티, GW 설정 |
 | `packages/editor-ext/` | 2 | 252 | 인라인 댓글 확장 |
-| **합계** | **30** | **~4,600** | |
+| **합계** | **54** | **~11,600** | |
 
 ---
 
